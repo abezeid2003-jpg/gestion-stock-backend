@@ -158,6 +158,95 @@ app.post('/bon-sortie', async (req, res) => {
   }
 });
 
+// Ajouter un produit
+app.post('/produits', async (req, res) => {
+  const { code_produit, designation, unite, 
+          prix_achat, prix_vente, stock_minimum } = req.body;
+  try {
+    const result = await pool.query(
+      `INSERT INTO T_Produits 
+       (code_produit, designation, unite, prix_achat, prix_vente, stock_minimum) 
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [code_produit, designation, unite, 
+       prix_achat, prix_vente, stock_minimum]
+    );
+    res.json({ success: true, produit: result.rows[0] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Supprimer un produit
+app.delete('/produits/:id', async (req, res) => {
+  try {
+    await pool.query(
+      'DELETE FROM T_Produits WHERE id_produit = $1',
+      [req.params.id]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Ajouter un client
+app.post('/clients', async (req, res) => {
+  const { code_client, nom, telephone, adresse } = req.body;
+  try {
+    const result = await pool.query(
+      `INSERT INTO T_Clients 
+       (code_client, nom, telephone, adresse) 
+       VALUES ($1, $2, $3, $4) RETURNING *`,
+      [code_client, nom, telephone, adresse]
+    );
+    res.json({ success: true, client: result.rows[0] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Supprimer un client
+app.delete('/clients/:id', async (req, res) => {
+  try {
+    await pool.query(
+      'DELETE FROM T_Clients WHERE id_client = $1',
+      [req.params.id]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Ajouter un fournisseur
+app.post('/fournisseurs', async (req, res) => {
+  const { code_fournisseur, nom, telephone, adresse } = req.body;
+  try {
+    const result = await pool.query(
+      `INSERT INTO T_Fournisseurs 
+       (code_fournisseur, nom, telephone, adresse) 
+       VALUES ($1, $2, $3, $4) RETURNING *`,
+      [code_fournisseur, nom, telephone, adresse]
+    );
+    res.json({ success: true, fournisseur: result.rows[0] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Supprimer un fournisseur
+app.delete('/fournisseurs/:id', async (req, res) => {
+  try {
+    await pool.query(
+      'DELETE FROM T_Fournisseurs WHERE id_fournisseur = $1',
+      [req.params.id]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Serveur démarré sur le port ${PORT}`);
 });
