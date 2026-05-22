@@ -247,6 +247,112 @@ app.delete('/fournisseurs/:id', async (req, res) => {
   }
 });
 
+// Recuperer tous les bons d'entree
+app.get('/bons-entree', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT be.*, f.nom AS nom_fournisseur
+      FROM T_Bon_Entree be
+      LEFT JOIN T_Fournisseurs f ON be.id_fournisseur = f.id_fournisseur
+      ORDER BY be.date_bon DESC
+    `);
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Recuperer les lignes d'un bon d'entree
+app.get('/bons-entree/:id/lignes', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT bel.*, p.designation, p.code_produit
+      FROM T_Bon_Entree_Lignes bel
+      LEFT JOIN T_Produits p ON bel.id_produit = p.id_produit
+      WHERE bel.id_bon_entree = $1
+    `, [req.params.id]);
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Supprimer un bon d'entree
+app.delete('/bons-entree/:id', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(
+      'DELETE FROM T_Bon_Entree_Lignes WHERE id_bon_entree = $1',
+      [req.params.id]
+    );
+    await client.query(
+      'DELETE FROM T_Bon_Entree WHERE id_bon_entree = $1',
+      [req.params.id]
+    );
+    await client.query('COMMIT');
+    res.json({ success: true });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+// Recuperer tous les bons de sortie
+app.get('/bons-sortie', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT bs.*, c.nom AS nom_client
+      FROM T_Bon_Sortie bs
+      LEFT JOIN T_Clients c ON bs.id_client = c.id_client
+      ORDER BY bs.date_bon DESC
+    `);
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Recuperer les lignes d'un bon de sortie
+app.get('/bons-sortie/:id/lignes', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT bsl.*, p.designation, p.code_produit
+      FROM T_Bon_Sortie_Lignes bsl
+      LEFT JOIN T_Produits p ON bsl.id_produit = p.id_produit
+      WHERE bsl.id_bon_sortie = $1
+    `, [req.params.id]);
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Supprimer un bon de sortie
+app.delete('/bons-sortie/:id', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(
+      'DELETE FROM T_Bon_Sortie_Lignes WHERE id_bon_sortie = $1',
+      [req.params.id]
+    );
+    await client.query(
+      'DELETE FROM T_Bon_Sortie WHERE id_bon_sortie = $1',
+      [req.params.id]
+    );
+    await client.query('COMMIT');
+    res.json({ success: true });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Serveur démarré sur le port ${PORT}`);
 });
