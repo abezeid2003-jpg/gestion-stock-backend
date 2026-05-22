@@ -72,22 +72,17 @@ app.post('/bon-entree', async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    
-    // Insérer le bon
     const bonResult = await client.query(
       'INSERT INTO T_Bon_Entree (numero_bon, date_bon, id_fournisseur, observation) VALUES ($1, $2, $3, $4) RETURNING id_bon_entree',
       [numero_bon, date_bon, id_fournisseur, observation]
     );
     const id_bon_entree = bonResult.rows[0].id_bon_entree;
-
-    // Insérer les lignes
     for (const ligne of lignes) {
       await client.query(
         'INSERT INTO T_Bon_Entree_Lignes (id_bon_entree, id_produit, quantite, prix_unitaire) VALUES ($1, $2, $3, $4)',
         [id_bon_entree, ligne.id_produit, ligne.quantite, ligne.prix_unitaire]
       );
     }
-
     await client.query('COMMIT');
     res.json({ success: true, id_bon_entree });
   } catch (err) {
@@ -104,50 +99,17 @@ app.post('/bon-sortie', async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    
     const bonResult = await client.query(
       'INSERT INTO T_Bon_Sortie (numero_bon, date_bon, id_client, observation) VALUES ($1, $2, $3, $4) RETURNING id_bon_sortie',
       [numero_bon, date_bon, id_client, observation]
     );
     const id_bon_sortie = bonResult.rows[0].id_bon_sortie;
-
     for (const ligne of lignes) {
       await client.query(
         'INSERT INTO T_Bon_Sortie_Lignes (id_bon_sortie, id_produit, quantite, prix_unitaire) VALUES ($1, $2, $3, $4)',
         [id_bon_sortie, ligne.id_produit, ligne.quantite, ligne.prix_unitaire]
       );
     }
-
-    await client.query('COMMIT');
-    res.json({ success: true, id_bon_sortie });
-  } catch (err) {
-    await client.query('ROLLBACK');
-    res.status(500).json({ error: err.message });
-  } finally {
-    client.release();
-  }
-});
-
-// Ajouter un bon de sortie
-app.post('/bon-sortie', async (req, res) => {
-  const { numero_bon, date_bon, id_client, observation, lignes } = req.body;
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-    
-    const bonResult = await client.query(
-      'INSERT INTO T_Bon_Sortie (numero_bon, date_bon, id_client, observation) VALUES ($1, $2, $3, $4) RETURNING id_bon_sortie',
-      [numero_bon, date_bon, id_client, observation]
-    );
-    const id_bon_sortie = bonResult.rows[0].id_bon_sortie;
-
-    for (const ligne of lignes) {
-      await client.query(
-        'INSERT INTO T_Bon_Sortie_Lignes (id_bon_sortie, id_produit, quantite, prix_unitaire) VALUES ($1, $2, $3, $4)',
-        [id_bon_sortie, ligne.id_produit, ligne.quantite, ligne.prix_unitaire]
-      );
-    }
-
     await client.query('COMMIT');
     res.json({ success: true, id_bon_sortie });
   } catch (err) {
@@ -160,17 +122,32 @@ app.post('/bon-sortie', async (req, res) => {
 
 // Ajouter un produit
 app.post('/produits', async (req, res) => {
-  const { code_produit, designation, unite, 
-          prix_achat, prix_vente, stock_minimum } = req.body;
+  const { code_produit, designation, unite, prix_achat, prix_vente, stock_minimum } = req.body;
   try {
     const result = await pool.query(
-      `INSERT INTO T_Produits 
-       (code_produit, designation, unite, prix_achat, prix_vente, stock_minimum) 
+      `INSERT INTO T_Produits (code_produit, designation, unite, prix_achat, prix_vente, stock_minimum) 
        VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [code_produit, designation, unite, 
-       prix_achat, prix_vente, stock_minimum]
+      [code_produit, designation, unite, prix_achat, prix_vente, stock_minimum]
     );
     res.json({ success: true, produit: result.rows[0] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Modifier un produit ✏️
+app.put('/produits/:id', async (req, res) => {
+  const { id } = req.params;
+  const { code_produit, designation, unite, prix_achat, prix_vente, stock_minimum } = req.body;
+  try {
+    const result = await pool.query(
+      `UPDATE T_Produits 
+       SET code_produit = $1, designation = $2, unite = $3, prix_achat = $4, prix_vente = $5, stock_minimum = $6
+       WHERE id_produit = $7 RETURNING *`,
+      [code_produit, designation, unite, prix_achat, prix_vente, stock_minimum, id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ message: 'Produit non trouve' });
+    res.json(result.rows[0]);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -179,10 +156,7 @@ app.post('/produits', async (req, res) => {
 // Supprimer un produit
 app.delete('/produits/:id', async (req, res) => {
   try {
-    await pool.query(
-      'DELETE FROM T_Produits WHERE id_produit = $1',
-      [req.params.id]
-    );
+    await pool.query('DELETE FROM T_Produits WHERE id_produit = $1', [req.params.id]);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -194,8 +168,7 @@ app.post('/clients', async (req, res) => {
   const { code_client, nom, telephone, adresse } = req.body;
   try {
     const result = await pool.query(
-      `INSERT INTO T_Clients 
-       (code_client, nom, telephone, adresse) 
+      `INSERT INTO T_Clients (code_client, nom, telephone, adresse) 
        VALUES ($1, $2, $3, $4) RETURNING *`,
       [code_client, nom, telephone, adresse]
     );
@@ -205,13 +178,28 @@ app.post('/clients', async (req, res) => {
   }
 });
 
+// Modifier un client ✏️
+app.put('/clients/:id', async (req, res) => {
+  const { id } = req.params;
+  const { code_client, nom, telephone, adresse } = req.body;
+  try {
+    const result = await pool.query(
+      `UPDATE T_Clients 
+       SET code_client = $1, nom = $2, telephone = $3, adresse = $4
+       WHERE id_client = $5 RETURNING *`,
+      [code_client, nom, telephone, adresse, id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ message: 'Client non trouve' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Supprimer un client
 app.delete('/clients/:id', async (req, res) => {
   try {
-    await pool.query(
-      'DELETE FROM T_Clients WHERE id_client = $1',
-      [req.params.id]
-    );
+    await pool.query('DELETE FROM T_Clients WHERE id_client = $1', [req.params.id]);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -223,8 +211,7 @@ app.post('/fournisseurs', async (req, res) => {
   const { code_fournisseur, nom, telephone, adresse } = req.body;
   try {
     const result = await pool.query(
-      `INSERT INTO T_Fournisseurs 
-       (code_fournisseur, nom, telephone, adresse) 
+      `INSERT INTO T_Fournisseurs (code_fournisseur, nom, telephone, adresse) 
        VALUES ($1, $2, $3, $4) RETURNING *`,
       [code_fournisseur, nom, telephone, adresse]
     );
@@ -234,13 +221,28 @@ app.post('/fournisseurs', async (req, res) => {
   }
 });
 
+// Modifier un fournisseur ✏️
+app.put('/fournisseurs/:id', async (req, res) => {
+  const { id } = req.params;
+  const { code_fournisseur, nom, telephone, adresse } = req.body;
+  try {
+    const result = await pool.query(
+      `UPDATE T_Fournisseurs 
+       SET code_fournisseur = $1, nom = $2, telephone = $3, adresse = $4
+       WHERE id_fournisseur = $5 RETURNING *`,
+      [code_fournisseur, nom, telephone, adresse, id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ message: 'Fournisseur non trouve' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Supprimer un fournisseur
 app.delete('/fournisseurs/:id', async (req, res) => {
   try {
-    await pool.query(
-      'DELETE FROM T_Fournisseurs WHERE id_fournisseur = $1',
-      [req.params.id]
-    );
+    await pool.query('DELETE FROM T_Fournisseurs WHERE id_fournisseur = $1', [req.params.id]);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -282,14 +284,8 @@ app.delete('/bons-entree/:id', async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    await client.query(
-      'DELETE FROM T_Bon_Entree_Lignes WHERE id_bon_entree = $1',
-      [req.params.id]
-    );
-    await client.query(
-      'DELETE FROM T_Bon_Entree WHERE id_bon_entree = $1',
-      [req.params.id]
-    );
+    await client.query('DELETE FROM T_Bon_Entree_Lignes WHERE id_bon_entree = $1', [req.params.id]);
+    await client.query('DELETE FROM T_Bon_Entree WHERE id_bon_entree = $1', [req.params.id]);
     await client.query('COMMIT');
     res.json({ success: true });
   } catch (err) {
@@ -335,14 +331,8 @@ app.delete('/bons-sortie/:id', async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    await client.query(
-      'DELETE FROM T_Bon_Sortie_Lignes WHERE id_bon_sortie = $1',
-      [req.params.id]
-    );
-    await client.query(
-      'DELETE FROM T_Bon_Sortie WHERE id_bon_sortie = $1',
-      [req.params.id]
-    );
+    await client.query('DELETE FROM T_Bon_Sortie_Lignes WHERE id_bon_sortie = $1', [req.params.id]);
+    await client.query('DELETE FROM T_Bon_Sortie WHERE id_bon_sortie = $1', [req.params.id]);
     await client.query('COMMIT');
     res.json({ success: true });
   } catch (err) {
