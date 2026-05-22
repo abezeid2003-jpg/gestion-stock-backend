@@ -343,6 +343,76 @@ app.delete('/bons-sortie/:id', async (req, res) => {
   }
 });
 
+// Modifier un bon d'entree
+app.put('/bons-entree/:id', async (req, res) => {
+  const { id } = req.params;
+  const { numero_bon, date_bon, id_fournisseur, observation, lignes } = req.body;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    // Mettre a jour l'entete
+    await client.query(
+      `UPDATE T_Bon_Entree 
+       SET numero_bon = $1, date_bon = $2, id_fournisseur = $3, observation = $4
+       WHERE id_bon_entree = $5`,
+      [numero_bon, date_bon, id_fournisseur, observation, id]
+    );
+    // Supprimer les anciennes lignes
+    await client.query(
+      'DELETE FROM T_Bon_Entree_Lignes WHERE id_bon_entree = $1', [id]
+    );
+    // Inserer les nouvelles lignes
+    for (const ligne of lignes) {
+      await client.query(
+        'INSERT INTO T_Bon_Entree_Lignes (id_bon_entree, id_produit, quantite, prix_unitaire) VALUES ($1, $2, $3, $4)',
+        [id, ligne.id_produit, ligne.quantite, ligne.prix_unitaire]
+      );
+    }
+    await client.query('COMMIT');
+    res.json({ success: true });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+// Modifier un bon de sortie
+app.put('/bons-sortie/:id', async (req, res) => {
+  const { id } = req.params;
+  const { numero_bon, date_bon, id_client, observation, lignes } = req.body;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    // Mettre a jour l'entete
+    await client.query(
+      `UPDATE T_Bon_Sortie 
+       SET numero_bon = $1, date_bon = $2, id_client = $3, observation = $4
+       WHERE id_bon_sortie = $5`,
+      [numero_bon, date_bon, id_client, observation, id]
+    );
+    // Supprimer les anciennes lignes
+    await client.query(
+      'DELETE FROM T_Bon_Sortie_Lignes WHERE id_bon_sortie = $1', [id]
+    );
+    // Inserer les nouvelles lignes
+    for (const ligne of lignes) {
+      await client.query(
+        'INSERT INTO T_Bon_Sortie_Lignes (id_bon_sortie, id_produit, quantite, prix_unitaire) VALUES ($1, $2, $3, $4)',
+        [id, ligne.id_produit, ligne.quantite, ligne.prix_unitaire]
+      );
+    }
+    await client.query('COMMIT');
+    res.json({ success: true });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Serveur démarré sur le port ${PORT}`);
 });
