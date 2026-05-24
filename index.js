@@ -70,7 +70,6 @@ app.get('/stock', async (req, res) => {
 
 const PORT = 3000;
 
-// Ajouter un bon d'entrée
 app.post('/bon-entree', async (req, res) => {
   const { numero_bon, date_bon, id_fournisseur, observation, lignes } = req.body;
   const client = await pool.connect();
@@ -97,7 +96,6 @@ app.post('/bon-entree', async (req, res) => {
   }
 });
 
-// Ajouter un bon de sortie
 app.post('/bon-sortie', async (req, res) => {
   const { numero_bon, date_bon, id_client, observation, lignes } = req.body;
   const client = await pool.connect();
@@ -124,7 +122,6 @@ app.post('/bon-sortie', async (req, res) => {
   }
 });
 
-// Ajouter un produit
 app.post('/produits', async (req, res) => {
   const { code_produit, designation, unite, prix_achat, prix_vente, stock_minimum } = req.body;
   try {
@@ -139,7 +136,6 @@ app.post('/produits', async (req, res) => {
   }
 });
 
-// Modifier un produit
 app.put('/produits/:id', async (req, res) => {
   const { id } = req.params;
   const { code_produit, designation, unite, prix_achat, prix_vente, stock_minimum } = req.body;
@@ -157,7 +153,6 @@ app.put('/produits/:id', async (req, res) => {
   }
 });
 
-// Supprimer un produit
 app.delete('/produits/:id', async (req, res) => {
   try {
     await pool.query('DELETE FROM T_Produits WHERE id_produit = $1', [req.params.id]);
@@ -167,13 +162,11 @@ app.delete('/produits/:id', async (req, res) => {
   }
 });
 
-// Ajouter un client
 app.post('/clients', async (req, res) => {
   const { code_client, nom, telephone, adresse } = req.body;
   try {
     const result = await pool.query(
-      `INSERT INTO T_Clients (code_client, nom, telephone, adresse) 
-       VALUES ($1, $2, $3, $4) RETURNING *`,
+      `INSERT INTO T_Clients (code_client, nom, telephone, adresse) VALUES ($1, $2, $3, $4) RETURNING *`,
       [code_client, nom, telephone, adresse]
     );
     res.json({ success: true, client: result.rows[0] });
@@ -182,15 +175,12 @@ app.post('/clients', async (req, res) => {
   }
 });
 
-// Modifier un client
 app.put('/clients/:id', async (req, res) => {
   const { id } = req.params;
   const { code_client, nom, telephone, adresse } = req.body;
   try {
     const result = await pool.query(
-      `UPDATE T_Clients 
-       SET code_client = $1, nom = $2, telephone = $3, adresse = $4
-       WHERE id_client = $5 RETURNING *`,
+      `UPDATE T_Clients SET code_client = $1, nom = $2, telephone = $3, adresse = $4 WHERE id_client = $5 RETURNING *`,
       [code_client, nom, telephone, adresse, id]
     );
     if (result.rows.length === 0) return res.status(404).json({ message: 'Client non trouve' });
@@ -200,7 +190,6 @@ app.put('/clients/:id', async (req, res) => {
   }
 });
 
-// Supprimer un client
 app.delete('/clients/:id', async (req, res) => {
   try {
     await pool.query('DELETE FROM T_Clients WHERE id_client = $1', [req.params.id]);
@@ -210,13 +199,11 @@ app.delete('/clients/:id', async (req, res) => {
   }
 });
 
-// Ajouter un fournisseur
 app.post('/fournisseurs', async (req, res) => {
   const { code_fournisseur, nom, telephone, adresse } = req.body;
   try {
     const result = await pool.query(
-      `INSERT INTO T_Fournisseurs (code_fournisseur, nom, telephone, adresse) 
-       VALUES ($1, $2, $3, $4) RETURNING *`,
+      `INSERT INTO T_Fournisseurs (code_fournisseur, nom, telephone, adresse) VALUES ($1, $2, $3, $4) RETURNING *`,
       [code_fournisseur, nom, telephone, adresse]
     );
     res.json({ success: true, fournisseur: result.rows[0] });
@@ -225,15 +212,12 @@ app.post('/fournisseurs', async (req, res) => {
   }
 });
 
-// Modifier un fournisseur
 app.put('/fournisseurs/:id', async (req, res) => {
   const { id } = req.params;
   const { code_fournisseur, nom, telephone, adresse } = req.body;
   try {
     const result = await pool.query(
-      `UPDATE T_Fournisseurs 
-       SET code_fournisseur = $1, nom = $2, telephone = $3, adresse = $4
-       WHERE id_fournisseur = $5 RETURNING *`,
+      `UPDATE T_Fournisseurs SET code_fournisseur = $1, nom = $2, telephone = $3, adresse = $4 WHERE id_fournisseur = $5 RETURNING *`,
       [code_fournisseur, nom, telephone, adresse, id]
     );
     if (result.rows.length === 0) return res.status(404).json({ message: 'Fournisseur non trouve' });
@@ -243,7 +227,6 @@ app.put('/fournisseurs/:id', async (req, res) => {
   }
 });
 
-// Supprimer un fournisseur
 app.delete('/fournisseurs/:id', async (req, res) => {
   try {
     await pool.query('DELETE FROM T_Fournisseurs WHERE id_fournisseur = $1', [req.params.id]);
@@ -253,7 +236,6 @@ app.delete('/fournisseurs/:id', async (req, res) => {
   }
 });
 
-// Recuperer tous les bons d'entree
 app.get('/bons-entree', async (req, res) => {
   try {
     const result = await pool.query(`
@@ -268,7 +250,6 @@ app.get('/bons-entree', async (req, res) => {
   }
 });
 
-// Recuperer les lignes d'un bon d'entree
 app.get('/bons-entree/:id/lignes', async (req, res) => {
   try {
     const result = await pool.query(`
@@ -283,7 +264,6 @@ app.get('/bons-entree/:id/lignes', async (req, res) => {
   }
 });
 
-// Supprimer un bon d'entree
 app.delete('/bons-entree/:id', async (req, res) => {
   const client = await pool.connect();
   try {
@@ -300,7 +280,6 @@ app.delete('/bons-entree/:id', async (req, res) => {
   }
 });
 
-// Recuperer tous les bons de sortie
 app.get('/bons-sortie', async (req, res) => {
   try {
     const result = await pool.query(`
@@ -315,7 +294,6 @@ app.get('/bons-sortie', async (req, res) => {
   }
 });
 
-// Recuperer les lignes d'un bon de sortie
 app.get('/bons-sortie/:id/lignes', async (req, res) => {
   try {
     const result = await pool.query(`
@@ -330,7 +308,6 @@ app.get('/bons-sortie/:id/lignes', async (req, res) => {
   }
 });
 
-// Supprimer un bon de sortie
 app.delete('/bons-sortie/:id', async (req, res) => {
   const client = await pool.connect();
   try {
@@ -347,7 +324,6 @@ app.delete('/bons-sortie/:id', async (req, res) => {
   }
 });
 
-// Modifier un bon d'entree
 app.put('/bons-entree/:id', async (req, res) => {
   const { id } = req.params;
   const { numero_bon, date_bon, id_fournisseur, observation, lignes } = req.body;
@@ -355,9 +331,7 @@ app.put('/bons-entree/:id', async (req, res) => {
   try {
     await client.query('BEGIN');
     await client.query(
-      `UPDATE T_Bon_Entree 
-       SET numero_bon = $1, date_bon = $2, id_fournisseur = $3, observation = $4
-       WHERE id_bon_entree = $5`,
+      `UPDATE T_Bon_Entree SET numero_bon = $1, date_bon = $2, id_fournisseur = $3, observation = $4 WHERE id_bon_entree = $5`,
       [numero_bon, date_bon, id_fournisseur, observation, id]
     );
     await client.query('DELETE FROM T_Bon_Entree_Lignes WHERE id_bon_entree = $1', [id]);
@@ -377,7 +351,6 @@ app.put('/bons-entree/:id', async (req, res) => {
   }
 });
 
-// Modifier un bon de sortie
 app.put('/bons-sortie/:id', async (req, res) => {
   const { id } = req.params;
   const { numero_bon, date_bon, id_client, observation, lignes } = req.body;
@@ -385,9 +358,7 @@ app.put('/bons-sortie/:id', async (req, res) => {
   try {
     await client.query('BEGIN');
     await client.query(
-      `UPDATE T_Bon_Sortie 
-       SET numero_bon = $1, date_bon = $2, id_client = $3, observation = $4
-       WHERE id_bon_sortie = $5`,
+      `UPDATE T_Bon_Sortie SET numero_bon = $1, date_bon = $2, id_client = $3, observation = $4 WHERE id_bon_sortie = $5`,
       [numero_bon, date_bon, id_client, observation, id]
     );
     await client.query('DELETE FROM T_Bon_Sortie_Lignes WHERE id_bon_sortie = $1', [id]);
@@ -407,67 +378,70 @@ app.put('/bons-sortie/:id', async (req, res) => {
   }
 });
 
-// 📋 FICHE MOUVEMENTS D'UN PRODUIT
+// FICHE MOUVEMENTS D'UN PRODUIT
 app.get('/mouvements/:id_produit', async (req, res) => {
   const { id_produit } = req.params;
   try {
-    // Info produit
-    const produit = await pool.query(
-      `SELECT * FROM T_Produits WHERE id_produit = $1`,
-      [id_produit]
-    );
-
-    // Stock initial (colonnes reelles : quantite, prix_unitaire, date_saisie)
+    const produit = await pool.query(`SELECT * FROM T_Produits WHERE id_produit = $1`, [id_produit]);
     const stockInitial = await pool.query(
-      `SELECT quantite, prix_unitaire, date_saisie
-       FROM T_Stock_Initial
-       WHERE id_produit = $1`,
-      [id_produit]
+      `SELECT quantite, prix_unitaire, date_saisie FROM T_Stock_Initial WHERE id_produit = $1`, [id_produit]
     );
-
-    // Entrees
     const entrees = await pool.query(
       `SELECT be.numero_bon, be.date_bon, f.nom AS nom_fournisseur,
-              bel.quantite, bel.prix_unitaire,
-              bel.quantite * bel.prix_unitaire AS montant
+              bel.quantite, bel.prix_unitaire, bel.quantite * bel.prix_unitaire AS montant
        FROM T_Bon_Entree_Lignes bel
        JOIN T_Bon_Entree be ON bel.id_bon_entree = be.id_bon_entree
        JOIN T_Fournisseurs f ON be.id_fournisseur = f.id_fournisseur
-       WHERE bel.id_produit = $1
-       ORDER BY be.date_bon ASC, be.numero_bon ASC`,
-      [id_produit]
+       WHERE bel.id_produit = $1 ORDER BY be.date_bon ASC, be.numero_bon ASC`, [id_produit]
     );
-
-    // Sorties
     const sorties = await pool.query(
       `SELECT bs.numero_bon, bs.date_bon, c.nom AS nom_client,
-              bsl.quantite, bsl.prix_unitaire,
-              bsl.quantite * bsl.prix_unitaire AS montant
+              bsl.quantite, bsl.prix_unitaire, bsl.quantite * bsl.prix_unitaire AS montant
        FROM T_Bon_Sortie_Lignes bsl
        JOIN T_Bon_Sortie bs ON bsl.id_bon_sortie = bs.id_bon_sortie
        JOIN T_Clients c ON bs.id_client = c.id_client
-       WHERE bsl.id_produit = $1
-       ORDER BY bs.date_bon ASC, bs.numero_bon ASC`,
-      [id_produit]
+       WHERE bsl.id_produit = $1 ORDER BY bs.date_bon ASC, bs.numero_bon ASC`, [id_produit]
     );
-
     const qteInitiale = stockInitial.rows[0] ? Number(stockInitial.rows[0].quantite) : 0;
     const totalEntrees = entrees.rows.reduce((sum, e) => sum + Number(e.quantite), 0);
     const totalSorties = sorties.rows.reduce((sum, s) => sum + Number(s.quantite), 0);
-    const stockFinal = qteInitiale + totalEntrees - totalSorties;
-
     res.json({
       produit: produit.rows[0],
       stock_initial: stockInitial.rows[0] || { quantite: 0, prix_unitaire: 0, date_saisie: null },
       entrees: entrees.rows,
       sorties: sorties.rows,
-      totaux: {
-        qte_initiale: qteInitiale,
-        total_entrees: totalEntrees,
-        total_sorties: totalSorties,
-        stock_final: stockFinal,
-      }
+      totaux: { qte_initiale: qteInitiale, total_entrees: totalEntrees, total_sorties: totalSorties, stock_final: qteInitiale + totalEntrees - totalSorties }
     });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// FICHE DE STOCK PAR PERIODE
+app.get('/fiche-stock', async (req, res) => {
+  const { date_debut, date_fin } = req.query;
+  try {
+    const result = await pool.query(`
+      SELECT 
+        p.code_produit,
+        p.designation,
+        p.unite,
+        COALESCE(si.quantite, 0) AS stock_initial,
+        COALESCE(SUM(CASE WHEN be.date_bon >= $1 AND be.date_bon <= $2 THEN bel.quantite ELSE 0 END), 0) AS total_entrees,
+        COALESCE(SUM(CASE WHEN bs.date_bon >= $1 AND bs.date_bon <= $2 THEN bsl.quantite ELSE 0 END), 0) AS total_sorties,
+        COALESCE(si.quantite, 0) +
+        COALESCE(SUM(CASE WHEN be.date_bon >= $1 AND be.date_bon <= $2 THEN bel.quantite ELSE 0 END), 0) -
+        COALESCE(SUM(CASE WHEN bs.date_bon >= $1 AND bs.date_bon <= $2 THEN bsl.quantite ELSE 0 END), 0) AS stock_disponible
+      FROM T_Produits p
+      LEFT JOIN T_Stock_Initial si ON p.id_produit = si.id_produit
+      LEFT JOIN T_Bon_Entree_Lignes bel ON p.id_produit = bel.id_produit
+      LEFT JOIN T_Bon_Entree be ON bel.id_bon_entree = be.id_bon_entree
+      LEFT JOIN T_Bon_Sortie_Lignes bsl ON p.id_produit = bsl.id_produit
+      LEFT JOIN T_Bon_Sortie bs ON bsl.id_bon_sortie = bs.id_bon_sortie
+      GROUP BY p.id_produit, p.code_produit, p.designation, p.unite, si.quantite
+      ORDER BY p.code_produit
+    `, [date_debut, date_fin]);
+    res.json(result.rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
