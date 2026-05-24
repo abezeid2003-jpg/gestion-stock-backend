@@ -447,6 +447,40 @@ app.get('/fiche-stock', async (req, res) => {
   }
 });
 
+// GET stock initial de tous les produits
+app.get('/stock-initial', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT p.id_produit, p.code_produit, p.designation, p.unite,
+             COALESCE(si.quantite, 0) AS quantite,
+             COALESCE(si.prix_unitaire, 0) AS prix_unitaire,
+             si.date_saisie
+      FROM T_Produits p
+      LEFT JOIN T_Stock_Initial si ON p.id_produit = si.id_produit
+      ORDER BY p.code_produit
+    `);
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST ajouter ou modifier stock initial (upsert)
+app.post('/stock-initial', async (req, res) => {
+  const { id_produit, quantite, prix_unitaire, date_saisie } = req.body;
+  try {
+    await pool.query(`
+      INSERT INTO T_Stock_Initial (id_produit, quantite, prix_unitaire, date_saisie)
+      VALUES ($1, $2, $3, $4)
+      ON CONFLICT (id_produit) 
+      DO UPDATE SET quantite = $2, prix_unitaire = $3, date_saisie = $4
+    `, [id_produit, quantite, prix_unitaire, date_saisie]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Serveur démarré sur le port ${PORT}`);
 });
