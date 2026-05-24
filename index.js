@@ -46,16 +46,20 @@ app.get('/stock', async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT 
+        p.id_produit,
         p.code_produit,
         p.designation,
         p.unite,
+        p.stock_minimum,
+        COALESCE(si.quantite, 0) AS stock_initial,
         COALESCE(SUM(bel.quantite), 0) AS total_entree,
         COALESCE(SUM(bsl.quantite), 0) AS total_sortie,
-        COALESCE(SUM(bel.quantite), 0) - COALESCE(SUM(bsl.quantite), 0) AS stock_actuel
+        COALESCE(si.quantite, 0) + COALESCE(SUM(bel.quantite), 0) - COALESCE(SUM(bsl.quantite), 0) AS stock_actuel
       FROM T_Produits p
+      LEFT JOIN T_Stock_Initial si ON p.id_produit = si.id_produit
       LEFT JOIN T_Bon_Entree_Lignes bel ON p.id_produit = bel.id_produit
       LEFT JOIN T_Bon_Sortie_Lignes bsl ON p.id_produit = bsl.id_produit
-      GROUP BY p.code_produit, p.designation, p.unite
+      GROUP BY p.id_produit, p.code_produit, p.designation, p.unite, p.stock_minimum, si.quantite
       ORDER BY p.code_produit
     `);
     res.json(result.rows);
@@ -135,7 +139,7 @@ app.post('/produits', async (req, res) => {
   }
 });
 
-// Modifier un produit ✏️
+// Modifier un produit
 app.put('/produits/:id', async (req, res) => {
   const { id } = req.params;
   const { code_produit, designation, unite, prix_achat, prix_vente, stock_minimum } = req.body;
@@ -178,7 +182,7 @@ app.post('/clients', async (req, res) => {
   }
 });
 
-// Modifier un client ✏️
+// Modifier un client
 app.put('/clients/:id', async (req, res) => {
   const { id } = req.params;
   const { code_client, nom, telephone, adresse } = req.body;
@@ -221,7 +225,7 @@ app.post('/fournisseurs', async (req, res) => {
   }
 });
 
-// Modifier un fournisseur ✏️
+// Modifier un fournisseur
 app.put('/fournisseurs/:id', async (req, res) => {
   const { id } = req.params;
   const { code_fournisseur, nom, telephone, adresse } = req.body;
@@ -350,18 +354,13 @@ app.put('/bons-entree/:id', async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    // Mettre a jour l'entete
     await client.query(
       `UPDATE T_Bon_Entree 
        SET numero_bon = $1, date_bon = $2, id_fournisseur = $3, observation = $4
        WHERE id_bon_entree = $5`,
       [numero_bon, date_bon, id_fournisseur, observation, id]
     );
-    // Supprimer les anciennes lignes
-    await client.query(
-      'DELETE FROM T_Bon_Entree_Lignes WHERE id_bon_entree = $1', [id]
-    );
-    // Inserer les nouvelles lignes
+    await client.query('DELETE FROM T_Bon_Entree_Lignes WHERE id_bon_entree = $1', [id]);
     for (const ligne of lignes) {
       await client.query(
         'INSERT INTO T_Bon_Entree_Lignes (id_bon_entree, id_produit, quantite, prix_unitaire) VALUES ($1, $2, $3, $4)',
@@ -385,18 +384,13 @@ app.put('/bons-sortie/:id', async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    // Mettre a jour l'entete
     await client.query(
       `UPDATE T_Bon_Sortie 
        SET numero_bon = $1, date_bon = $2, id_client = $3, observation = $4
        WHERE id_bon_sortie = $5`,
       [numero_bon, date_bon, id_client, observation, id]
     );
-    // Supprimer les anciennes lignes
-    await client.query(
-      'DELETE FROM T_Bon_Sortie_Lignes WHERE id_bon_sortie = $1', [id]
-    );
-    // Inserer les nouvelles lignes
+    await client.query('DELETE FROM T_Bon_Sortie_Lignes WHERE id_bon_sortie = $1', [id]);
     for (const ligne of lignes) {
       await client.query(
         'INSERT INTO T_Bon_Sortie_Lignes (id_bon_sortie, id_produit, quantite, prix_unitaire) VALUES ($1, $2, $3, $4)',
@@ -410,6 +404,72 @@ app.put('/bons-sortie/:id', async (req, res) => {
     res.status(500).json({ error: err.message });
   } finally {
     client.release();
+  }
+});
+
+// 📋 FICHE MOUVEMENTS D'UN PRODUIT
+app.get('/mouvements/:id_produit', async (req, res) => {
+  const { id_produit } = req.params;
+  try {
+    // Info produit
+    const produit = await pool.query(
+      `SELECT * FROM T_Produits WHERE id_produit = $1`,
+      [id_produit]
+    );
+
+    // Stock initial (colonnes reelles : quantite, prix_unitaire, date_saisie)
+    const stockInitial = await pool.query(
+      `SELECT quantite, prix_unitaire, date_saisie
+       FROM T_Stock_Initial
+       WHERE id_produit = $1`,
+      [id_produit]
+    );
+
+    // Entrees
+    const entrees = await pool.query(
+      `SELECT be.numero_bon, be.date_bon, f.nom AS nom_fournisseur,
+              bel.quantite, bel.prix_unitaire,
+              bel.quantite * bel.prix_unitaire AS montant
+       FROM T_Bon_Entree_Lignes bel
+       JOIN T_Bon_Entree be ON bel.id_bon_entree = be.id_bon_entree
+       JOIN T_Fournisseurs f ON be.id_fournisseur = f.id_fournisseur
+       WHERE bel.id_produit = $1
+       ORDER BY be.date_bon ASC, be.numero_bon ASC`,
+      [id_produit]
+    );
+
+    // Sorties
+    const sorties = await pool.query(
+      `SELECT bs.numero_bon, bs.date_bon, c.nom AS nom_client,
+              bsl.quantite, bsl.prix_unitaire,
+              bsl.quantite * bsl.prix_unitaire AS montant
+       FROM T_Bon_Sortie_Lignes bsl
+       JOIN T_Bon_Sortie bs ON bsl.id_bon_sortie = bs.id_bon_sortie
+       JOIN T_Clients c ON bs.id_client = c.id_client
+       WHERE bsl.id_produit = $1
+       ORDER BY bs.date_bon ASC, bs.numero_bon ASC`,
+      [id_produit]
+    );
+
+    const qteInitiale = stockInitial.rows[0] ? Number(stockInitial.rows[0].quantite) : 0;
+    const totalEntrees = entrees.rows.reduce((sum, e) => sum + Number(e.quantite), 0);
+    const totalSorties = sorties.rows.reduce((sum, s) => sum + Number(s.quantite), 0);
+    const stockFinal = qteInitiale + totalEntrees - totalSorties;
+
+    res.json({
+      produit: produit.rows[0],
+      stock_initial: stockInitial.rows[0] || { quantite: 0, prix_unitaire: 0, date_saisie: null },
+      entrees: entrees.rows,
+      sorties: sorties.rows,
+      totaux: {
+        qte_initiale: qteInitiale,
+        total_entrees: totalEntrees,
+        total_sorties: totalSorties,
+        stock_final: stockFinal,
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
