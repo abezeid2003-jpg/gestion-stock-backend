@@ -209,7 +209,7 @@ app.post('/produits', verifierToken, async (req, res) => {
   try {
     const result = await pool.query(
       `INSERT INTO T_Produits (code_produit, designation, unite, prix_achat, prix_vente, stock_minimum) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [code_produit, designation, unite, prix_achat, prix_vente, stock_minimum]
+      [code_produit, designation, unite, prix_achat || null, prix_vente || null, stock_minimum || null]
     );
     res.json({ success: true, produit: result.rows[0] });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -221,7 +221,7 @@ app.put('/produits/:id', verifierToken, adminSeulement, async (req, res) => {
   try {
     const result = await pool.query(
       `UPDATE T_Produits SET code_produit=$1, designation=$2, unite=$3, prix_achat=$4, prix_vente=$5, stock_minimum=$6 WHERE id_produit=$7 RETURNING *`,
-      [code_produit, designation, unite, prix_achat, prix_vente, stock_minimum, id]
+      [code_produit, designation, unite, prix_achat || null, prix_vente || null, stock_minimum || null, id]
     );
     if (result.rows.length === 0) return res.status(404).json({ message: 'Produit non trouve' });
     res.json(result.rows[0]);
