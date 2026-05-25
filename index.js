@@ -472,7 +472,21 @@ app.post('/stock-initial', verifierToken, async (req, res) => {
       INSERT INTO T_Stock_Initial (id_produit, quantite, prix_unitaire, date_saisie)
       VALUES ($1, $2, $3, $4)
       ON CONFLICT (id_produit) DO UPDATE SET quantite=$2, prix_unitaire=$3, date_saisie=$4
-    `, [id_produit, quantite, prix_unitaire, date_saisie]);
+    `, [id_produit, quantite !== "" ? quantite : 0, prix_unitaire !== "" ? prix_unitaire : 0, date_saisie || null]);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// MODIFIER STOCK INITIAL
+app.put('/stock-initial/:id_produit', verifierToken, async (req, res) => {
+  const { id_produit } = req.params;
+  const { quantite, prix_unitaire, date_saisie } = req.body;
+  try {
+    await pool.query(`
+      UPDATE T_Stock_Initial 
+      SET quantite=$1, prix_unitaire=$2, date_saisie=$3
+      WHERE id_produit=$4
+    `, [quantite !== "" ? quantite : 0, prix_unitaire !== "" ? prix_unitaire : 0, date_saisie || null, id_produit]);
     res.json({ success: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
