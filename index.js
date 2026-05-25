@@ -229,10 +229,19 @@ app.put('/produits/:id', verifierToken, adminSeulement, async (req, res) => {
 });
 
 app.delete('/produits/:id', verifierToken, adminSeulement, async (req, res) => {
+  const client = await pool.connect();
   try {
-    await pool.query('DELETE FROM T_Produits WHERE id_produit = $1', [req.params.id]);
+    await client.query('BEGIN');
+    await client.query('DELETE FROM T_Stock_Initial WHERE id_produit = $1', [req.params.id]);
+    await client.query('DELETE FROM T_Bon_Entree_Lignes WHERE id_produit = $1', [req.params.id]);
+    await client.query('DELETE FROM T_Bon_Sortie_Lignes WHERE id_produit = $1', [req.params.id]);
+    await client.query('DELETE FROM T_Produits WHERE id_produit = $1', [req.params.id]);
+    await client.query('COMMIT');
     res.json({ success: true });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: err.message });
+  } finally { client.release(); }
 });
 
 app.post('/clients', verifierToken, async (req, res) => {
