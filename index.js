@@ -500,5 +500,236 @@ app.put('/stock-initial/:id_produit', verifierToken, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ============================================================
+// SITUATION FINANCIERE CLIENT
+// ============================================================
+
+// SOLDE INITIAL CLIENT
+app.get('/solde-initial-client', verifierToken, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT s.*, c.nom AS nom_client, c.code_client
+      FROM T_Solde_Initial_Client s
+      JOIN T_Clients c ON s.id_client = c.id_client
+      ORDER BY c.nom
+    `);
+    res.json(result.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/solde-initial-client/:id_client', verifierToken, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT s.*, c.nom AS nom_client, c.code_client
+      FROM T_Solde_Initial_Client s
+      JOIN T_Clients c ON s.id_client = c.id_client
+      WHERE s.id_client = $1
+    `, [req.params.id_client]);
+    res.json(result.rows[0] || null);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/solde-initial-client', verifierToken, async (req, res) => {
+  const { id_client, montant, date_debut, observation } = req.body;
+  try {
+    await pool.query(`
+      INSERT INTO T_Solde_Initial_Client (id_client, montant, date_debut, observation)
+      VALUES ($1, $2, $3, $4)
+      ON CONFLICT DO NOTHING
+    `, [id_client, montant || 0, date_debut || null, observation || '']);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/solde-initial-client/:id_solde', verifierToken, async (req, res) => {
+  const { id_solde } = req.params;
+  const { montant, date_debut, observation } = req.body;
+  try {
+    await pool.query(`
+      UPDATE T_Solde_Initial_Client
+      SET montant=$1, date_debut=$2, observation=$3
+      WHERE id_solde=$4
+    `, [montant || 0, date_debut || null, observation || '', id_solde]);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/solde-initial-client/:id_solde', verifierToken, adminSeulement, async (req, res) => {
+  try {
+    await pool.query('DELETE FROM T_Solde_Initial_Client WHERE id_solde=$1', [req.params.id_solde]);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// STOCK INITIAL CLIENT
+app.get('/stock-initial-client/:id_client', verifierToken, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT p.id_produit, p.code_produit, p.designation, p.unite, p.prix_vente,
+             COALESCE(s.quantite, 0) AS quantite, COALESCE(s.id, 0) AS id
+      FROM T_Produits p
+      LEFT JOIN T_Stock_Initial_Client s ON p.id_produit = s.id_produit AND s.id_client = $1
+      ORDER BY p.code_produit
+    `, [req.params.id_client]);
+    res.json(result.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/stock-initial-client', verifierToken, async (req, res) => {
+  const { id_client, id_produit, quantite } = req.body;
+  try {
+    await pool.query(`
+      INSERT INTO T_Stock_Initial_Client (id_client, id_produit, quantite)
+      VALUES ($1, $2, $3)
+      ON CONFLICT (id_client, id_produit) DO UPDATE SET quantite=$3
+    `, [id_client, id_produit, quantite !== "" ? quantite : 0]);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// INVENTAIRE
+app.get('/inventaire/:id_client', verifierToken, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT i.*, p.code_produit, p.designation, p.unite, p.prix_vente
+      FROM T_Inventaire i
+      JOIN T_Produits p ON i.id_produit = p.id_produit
+      WHERE i.id_client = $1
+      ORDER BY i.date_inventaire DESC, p.code_produit
+    `, [req.params.id_client]);
+    res.json(result.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/inventaire', verifierToken, async (req, res) => {
+  const { id_client, id_produit, date_inventaire, qte_inventaire } = req.body;
+  try {
+    await pool.query(`
+      INSERT INTO T_Inventaire (id_client, id_produit, date_inventaire, qte_inventaire)
+      VALUES ($1, $2, $3, $4)
+    `, [id_client, id_produit, date_inventaire, qte_inventaire !== "" ? qte_inventaire : 0]);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/inventaire/:id_inventaire', verifierToken, async (req, res) => {
+  const { id_inventaire } = req.params;
+  const { date_inventaire, qte_inventaire } = req.body;
+  try {
+    await pool.query(`
+      UPDATE T_Inventaire SET date_inventaire=$1, qte_inventaire=$2 WHERE id_inventaire=$3
+    `, [date_inventaire, qte_inventaire !== "" ? qte_inventaire : 0, id_inventaire]);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/inventaire/:id_inventaire', verifierToken, adminSeulement, async (req, res) => {
+  try {
+    await pool.query('DELETE FROM T_Inventaire WHERE id_inventaire=$1', [req.params.id_inventaire]);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// PERIMES
+app.get('/perimes/:id_client', verifierToken, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT p.*, pr.code_produit, pr.designation, pr.unite, pr.prix_vente
+      FROM T_Perimes p
+      JOIN T_Produits pr ON p.id_produit = pr.id_produit
+      WHERE p.id_client = $1
+      ORDER BY p.date_inventaire DESC, pr.code_produit
+    `, [req.params.id_client]);
+    res.json(result.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/perimes', verifierToken, async (req, res) => {
+  const { id_client, id_produit, date_inventaire, qte_perimee } = req.body;
+  try {
+    await pool.query(`
+      INSERT INTO T_Perimes (id_client, id_produit, date_inventaire, qte_perimee)
+      VALUES ($1, $2, $3, $4)
+    `, [id_client, id_produit, date_inventaire, qte_perimee !== "" ? qte_perimee : 0]);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/perimes/:id_perime', verifierToken, async (req, res) => {
+  const { id_perime } = req.params;
+  const { date_inventaire, qte_perimee } = req.body;
+  try {
+    await pool.query(`
+      UPDATE T_Perimes SET date_inventaire=$1, qte_perimee=$2 WHERE id_perime=$3
+    `, [date_inventaire, qte_perimee !== "" ? qte_perimee : 0, id_perime]);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/perimes/:id_perime', verifierToken, adminSeulement, async (req, res) => {
+  try {
+    await pool.query('DELETE FROM T_Perimes WHERE id_perime=$1', [req.params.id_perime]);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// SITUATION FINANCIERE CLIENT (calcul complet)
+app.get('/situation-financiere/:id_client', verifierToken, async (req, res) => {
+  const { id_client } = req.params;
+  const { date_inventaire } = req.query;
+  try {
+    // Client
+    const client = await pool.query(`SELECT * FROM T_Clients WHERE id_client=$1`, [id_client]);
+
+    // Solde initial
+    const solde = await pool.query(`
+      SELECT * FROM T_Solde_Initial_Client WHERE id_client=$1
+    `, [id_client]);
+
+    // Calcul par produit
+    const produits = await pool.query(`
+      SELECT
+        p.id_produit, p.code_produit, p.designation, p.unite, p.prix_vente,
+        COALESCE(si.quantite, 0) AS stock_initial_client,
+        COALESCE(SUM(bsl.quantite), 0) AS total_sorties_client,
+        COALESCE(si.quantite, 0) + COALESCE(SUM(bsl.quantite), 0) AS s_mad,
+        COALESCE(inv.qte_inventaire, 0) AS s_inv,
+        COALESCE(per.qte_perimee, 0) AS s_perimes
+      FROM T_Produits p
+      LEFT JOIN T_Stock_Initial_Client si ON p.id_produit = si.id_produit AND si.id_client = $1
+      LEFT JOIN T_Bon_Sortie_Lignes bsl ON p.id_produit = bsl.id_produit
+      LEFT JOIN T_Bon_Sortie bs ON bsl.id_bon_sortie = bs.id_bon_sortie AND bs.id_client = $1
+      LEFT JOIN T_Inventaire inv ON p.id_produit = inv.id_produit AND inv.id_client = $1 AND inv.date_inventaire = $2
+      LEFT JOIN T_Perimes per ON p.id_produit = per.id_produit AND per.id_client = $1 AND per.date_inventaire = $2
+      WHERE (si.quantite > 0 OR COALESCE(SUM(bsl.quantite), 0) > 0)
+      GROUP BY p.id_produit, p.code_produit, p.designation, p.unite, p.prix_vente, si.quantite, inv.qte_inventaire, per.qte_perimee
+      ORDER BY p.code_produit
+    `, [id_client, date_inventaire]);
+
+    // Calcul S.V et valeurs
+    const lignes = produits.rows.map(p => {
+      const s_mad = Number(p.s_mad);
+      const s_inv = Number(p.s_inv);
+      const s_perimes = Number(p.s_perimes);
+      const s_v = s_mad - s_inv - s_perimes;
+      const prix_vente = Number(p.prix_vente) || 0;
+      const valeur_sv = s_v * prix_vente;
+      return { ...p, s_mad, s_inv, s_perimes, s_v, prix_vente, valeur_sv };
+    });
+
+    const total_valeur_sv = lignes.reduce((sum, l) => sum + l.valeur_sv, 0);
+    const solde_initial = solde.rows[0] ? Number(solde.rows[0].montant) : 0;
+    const total_creance = solde_initial + total_valeur_sv;
+
+    res.json({
+      client: client.rows[0],
+      solde_initial: solde.rows[0] || { montant: 0 },
+      date_inventaire,
+      lignes,
+      totaux: { total_valeur_sv, solde_initial, total_creance }
+    });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 const PORT = 3000;
 app.listen(PORT, () => { console.log(`Serveur démarré sur le port ${PORT}`); });
