@@ -604,10 +604,11 @@ app.get('/inventaire/:id_client', verifierToken, async (req, res) => {
 app.post('/inventaire', verifierToken, async (req, res) => {
   const { id_client, id_produit, date_inventaire, qte_inventaire } = req.body;
   try {
-    await pool.query(`
-      INSERT INTO T_Inventaire (id_client, id_produit, date_inventaire, qte_inventaire)
-      VALUES ($1, $2, $3, $4)
-    `, [id_client, id_produit, date_inventaire, qte_inventaire !== "" ? qte_inventaire : 0]);
+    // Supprimer l'ancien enregistrement pour ce client/produit/date
+    await pool.query(`DELETE FROM T_Inventaire WHERE id_client=$1 AND id_produit=$2 AND date_inventaire=$3`, [id_client, id_produit, date_inventaire]);
+    // Insérer le nouveau
+    await pool.query(`INSERT INTO T_Inventaire (id_client, id_produit, date_inventaire, qte_inventaire) VALUES ($1, $2, $3, $4)`,
+      [id_client, id_produit, date_inventaire, qte_inventaire !== "" ? qte_inventaire : 0]);
     res.json({ success: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -647,10 +648,11 @@ app.get('/perimes/:id_client', verifierToken, async (req, res) => {
 app.post('/perimes', verifierToken, async (req, res) => {
   const { id_client, id_produit, date_inventaire, qte_perimee } = req.body;
   try {
-    await pool.query(`
-      INSERT INTO T_Perimes (id_client, id_produit, date_inventaire, qte_perimee)
-      VALUES ($1, $2, $3, $4)
-    `, [id_client, id_produit, date_inventaire, qte_perimee !== "" ? qte_perimee : 0]);
+    // Supprimer l'ancien enregistrement pour ce client/produit/date
+    await pool.query(`DELETE FROM T_Perimes WHERE id_client=$1 AND id_produit=$2 AND date_inventaire=$3`, [id_client, id_produit, date_inventaire]);
+    // Insérer le nouveau
+    await pool.query(`INSERT INTO T_Perimes (id_client, id_produit, date_inventaire, qte_perimee) VALUES ($1, $2, $3, $4)`,
+      [id_client, id_produit, date_inventaire, qte_perimee !== "" ? qte_perimee : 0]);
     res.json({ success: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -693,16 +695,17 @@ app.get('/situation-financiere/:id_client', verifierToken, async (req, res) => {
         COALESCE(si.quantite, 0) AS stock_initial_client,
         COALESCE(SUM(CASE WHEN bs.id_client = $1 THEN bsl.quantite ELSE 0 END), 0) AS total_sorties_client,
         COALESCE(si.quantite, 0) + COALESCE(SUM(CASE WHEN bs.id_client = $1 THEN bsl.quantite ELSE 0 END), 0) AS s_mad,
-        COALESCE(inv.qte_inventaire, 0) AS s_inv,
-        COALESCE(per.qte_perimee, 0) AS s_perimes
+        COALESCE((SELECT qte_inventaire FROM T_Inventaire WHERE id_produit=p.id_produit AND id_client=$1 AND date_inventaire=$2 LIMIT 1), 0) AS s_inv,
+        COALESCE((SELECT qte_perimee FROM T_Perimes WHERE id_produit=p.id_produit AND id_client=$1 AND date_inventaire=$2 LIMIT 1), 0) AS s_perimes
       FROM T_Produits p
       LEFT JOIN T_Stock_Initial_Client si ON p.id_produit = si.id_produit AND si.id_client = $1
       LEFT JOIN T_Bon_Sortie_Lignes bsl ON p.id_produit = bsl.id_produit
       LEFT JOIN T_Bon_Sortie bs ON bsl.id_bon_sortie = bs.id_bon_sortie
-      LEFT JOIN T_Inventaire inv ON p.id_produit = inv.id_produit AND inv.id_client = $1 AND inv.date_inventaire = $2
-      LEFT JOIN T_Perimes per ON p.id_produit = per.id_produit AND per.id_client = $1 AND per.date_inventaire = $2
-      WHERE (si.id IS NOT NULL OR inv.id_inventaire IS NOT NULL)
-      GROUP BY p.id_produit, p.code_produit, p.designation, p.unite, p.prix_vente, si.quantite, inv.qte_inventaire, per.qte_perimee
+      WHERE (
+        si.id IS NOT NULL OR
+        EXISTS (SELECT 1 FROM T_Inventaire WHERE id_produit=p.id_produit AND id_client=$1 AND date_inventaire=$2)
+      )
+      GROUP BY p.id_produit, p.code_produit, p.designation, p.unite, p.prix_vente, si.quantite
       ORDER BY p.code_produit
     `, [id_client, date_inventaire]);
 
