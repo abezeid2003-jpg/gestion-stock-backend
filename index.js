@@ -701,7 +701,7 @@ app.get('/situation-financiere/:id_client', verifierToken, async (req, res) => {
       LEFT JOIN T_Bon_Sortie bs ON bsl.id_bon_sortie = bs.id_bon_sortie AND bs.id_client = $1
       LEFT JOIN T_Inventaire inv ON p.id_produit = inv.id_produit AND inv.id_client = $1 AND inv.date_inventaire = $2
       LEFT JOIN T_Perimes per ON p.id_produit = per.id_produit AND per.id_client = $1 AND per.date_inventaire = $2
-      WHERE (si.quantite > 0 OR COALESCE(SUM(bsl.quantite), 0) > 0)
+      WHERE (si.id IS NOT NULL OR inv.id_inventaire IS NOT NULL)
       GROUP BY p.id_produit, p.code_produit, p.designation, p.unite, p.prix_vente, si.quantite, inv.qte_inventaire, per.qte_perimee
       ORDER BY p.code_produit
     `, [id_client, date_inventaire]);
