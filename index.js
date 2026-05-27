@@ -706,6 +706,13 @@ app.get('/situation-financiere/:id_client', verifierToken, async (req, res) => {
       ORDER BY p.code_produit
     `, [id_client, date_inventaire]);
 
+    // Versements de la période
+    const versements = await pool.query(`
+      SELECT * FROM T_Versements
+      WHERE id_client = $1
+      ORDER BY date_versement ASC
+    `, [id_client]);
+
     // Calcul S.V et valeurs
     const lignes = produits.rows.map(p => {
       const s_mad = Number(p.s_mad);
@@ -720,14 +727,76 @@ app.get('/situation-financiere/:id_client', verifierToken, async (req, res) => {
     const total_valeur_sv = lignes.reduce((sum, l) => sum + l.valeur_sv, 0);
     const solde_initial = solde.rows[0] ? Number(solde.rows[0].montant) : 0;
     const total_creance = solde_initial + total_valeur_sv;
+    const total_versements = versements.rows.reduce((sum, v) => sum + Number(v.montant), 0);
+    const creance_nette = total_creance - total_versements;
 
     res.json({
       client: client.rows[0],
       solde_initial: solde.rows[0] || { montant: 0 },
       date_inventaire,
       lignes,
-      totaux: { total_valeur_sv, solde_initial, total_creance }
+      versements: versements.rows,
+      totaux: { total_valeur_sv, solde_initial, total_creance, total_versements, creance_nette }
     });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ============================================================
+// VERSEMENTS
+// ============================================================
+
+app.get('/versements/:id_client', verifierToken, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT v.*, c.nom AS nom_client, c.code_client
+      FROM T_Versements v
+      JOIN T_Clients c ON v.id_client = c.id_client
+      WHERE v.id_client = $1
+      ORDER BY v.date_versement DESC
+    `, [req.params.id_client]);
+    res.json(result.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/versements', verifierToken, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT v.*, c.nom AS nom_client, c.code_client
+      FROM T_Versements v
+      JOIN T_Clients c ON v.id_client = c.id_client
+      ORDER BY v.date_versement DESC
+    `);
+    res.json(result.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/versements', verifierToken, async (req, res) => {
+  const { id_client, date_versement, montant, mode_paiement, reference, observation } = req.body;
+  try {
+    const result = await pool.query(`
+      INSERT INTO T_Versements (id_client, date_versement, montant, mode_paiement, reference, observation)
+      VALUES ($1, $2, $3, $4, $5, $6) RETURNING *
+    `, [id_client, date_versement, montant || 0, mode_paiement || '', reference || '', observation || '']);
+    res.json({ success: true, versement: result.rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/versements/:id_versement', verifierToken, adminSeulement, async (req, res) => {
+  const { id_versement } = req.params;
+  const { date_versement, montant, mode_paiement, reference, observation } = req.body;
+  try {
+    await pool.query(`
+      UPDATE T_Versements SET date_versement=$1, montant=$2, mode_paiement=$3, reference=$4, observation=$5
+      WHERE id_versement=$6
+    `, [date_versement, montant || 0, mode_paiement || '', reference || '', observation || '', id_versement]);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/versements/:id_versement', verifierToken, adminSeulement, async (req, res) => {
+  try {
+    await pool.query('DELETE FROM T_Versements WHERE id_versement=$1', [req.params.id_versement]);
+    res.json({ success: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
