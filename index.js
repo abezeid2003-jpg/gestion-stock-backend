@@ -691,14 +691,14 @@ app.get('/situation-financiere/:id_client', verifierToken, async (req, res) => {
       SELECT
         p.id_produit, p.code_produit, p.designation, p.unite, p.prix_vente,
         COALESCE(si.quantite, 0) AS stock_initial_client,
-        COALESCE(SUM(bsl.quantite), 0) AS total_sorties_client,
-        COALESCE(si.quantite, 0) + COALESCE(SUM(bsl.quantite), 0) AS s_mad,
+        COALESCE(SUM(CASE WHEN bs.id_client = $1 THEN bsl.quantite ELSE 0 END), 0) AS total_sorties_client,
+        COALESCE(si.quantite, 0) + COALESCE(SUM(CASE WHEN bs.id_client = $1 THEN bsl.quantite ELSE 0 END), 0) AS s_mad,
         COALESCE(inv.qte_inventaire, 0) AS s_inv,
         COALESCE(per.qte_perimee, 0) AS s_perimes
       FROM T_Produits p
       LEFT JOIN T_Stock_Initial_Client si ON p.id_produit = si.id_produit AND si.id_client = $1
       LEFT JOIN T_Bon_Sortie_Lignes bsl ON p.id_produit = bsl.id_produit
-      LEFT JOIN T_Bon_Sortie bs ON bsl.id_bon_sortie = bs.id_bon_sortie AND bs.id_client = $1
+      LEFT JOIN T_Bon_Sortie bs ON bsl.id_bon_sortie = bs.id_bon_sortie
       LEFT JOIN T_Inventaire inv ON p.id_produit = inv.id_produit AND inv.id_client = $1 AND inv.date_inventaire = $2
       LEFT JOIN T_Perimes per ON p.id_produit = per.id_produit AND per.id_client = $1 AND per.date_inventaire = $2
       WHERE (si.id IS NOT NULL OR inv.id_inventaire IS NOT NULL)
